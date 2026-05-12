@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject var keybindingStore: KeybindingStore
 
     var body: some View {
         TabView {
@@ -9,9 +10,75 @@ struct SettingsView: View {
             aiTab.tabItem { Label("AI", systemImage: "sparkles") }
             editorTab.tabItem { Label("에디터", systemImage: "text.alignleft") }
             historyTab.tabItem { Label("이력", systemImage: "clock") }
+            keybindingsTab.tabItem { Label("키바인딩", systemImage: "keyboard") }
         }
         .frame(width: 600, height: 520)
         .padding(20)
+    }
+
+    private var keybindingsTab: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("키바인딩 (keybindings.json)")
+                .font(.headline)
+            Text("""
+            사용자 정의 키매핑은 \
+            `~/Library/Application Support/Ghostwriter/keybindings.json` 파일에 \
+            저장됩니다. 파일을 편집한 뒤 "다시 불러오기"를 누르세요.
+            """)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                Button("keybindings.json 열기") {
+                    let url = keybindingStore.ensureUserFile()
+                    NSWorkspace.shared.open(url)
+                }
+                Button("다시 불러오기") {
+                    keybindingStore.reload()
+                }
+                Spacer()
+            }
+
+            Divider()
+
+            Text("사용 가능한 명령 ID").font(.subheadline).bold()
+            Text("""
+            - editor.acceptGhost / editor.acceptGhostWord / editor.rejectGhost
+            - placeholder.next / placeholder.previous / placeholder.exit
+            - slash.navigateUp / slash.navigateDown / slash.select / slash.dismiss
+            - cursor.lineStart / cursor.lineEnd / cursor.docStart / cursor.docEnd
+            - noop (기본 매핑을 비활성화할 때 사용)
+            """)
+            .font(.caption.monospaced())
+            .foregroundStyle(.secondary)
+
+            Text("when 식별자").font(.subheadline).bold()
+            Text("""
+            editorFocus, ghostVisible, inPlaceholderMode, \
+            slashPopupVisible, hasSelection
+            연산자: && || ! ()
+            """)
+            .font(.caption.monospaced())
+            .foregroundStyle(.secondary)
+
+            Text("예시").font(.subheadline).bold()
+            Text("""
+            [
+              { "key": "cmd+j", "command": "editor.acceptGhostWord",
+                "when": "ghostVisible" },
+              { "key": "tab",   "command": "noop",
+                "when": "ghostVisible" }
+            ]
+            """)
+            .font(.caption.monospaced())
+            .padding(8)
+            .background(Color.secondary.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+
+            Spacer()
+        }
+        .padding()
     }
 
     private var generalTab: some View {
@@ -167,22 +234,24 @@ struct SettingsView: View {
 
     private var editorTab: some View {
         Form {
-            HStack {
-                Text("폰트")
-                Spacer()
+            labeledRow("폰트") {
                 TextField("", text: $viewModel.settings.fontFamily)
-                    .frame(width: 200)
                     .textFieldStyle(.roundedBorder)
-            }
-            HStack {
-                Text("폰트 크기")
+                    .frame(width: 220)
                 Spacer()
+            }
+            labeledRow("폰트 크기") {
                 Stepper(value: $viewModel.settings.fontSize, in: 9...32) {
                     Text("\(viewModel.settings.fontSize)pt")
                 }
                 .frame(width: 160)
+                Spacer()
             }
-            Toggle("줄 번호 표시", isOn: $viewModel.settings.showLineNumbers)
+            labeledRow("줄 번호") {
+                Toggle("", isOn: $viewModel.settings.showLineNumbers)
+                    .labelsHidden()
+                Spacer()
+            }
             HStack {
                 Spacer()
                 Button("저장") { viewModel.save() }

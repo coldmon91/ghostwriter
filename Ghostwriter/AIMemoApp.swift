@@ -11,6 +11,7 @@ struct GhostwriterApp: App {
     @StateObject private var settingsVM = SettingsViewModel()
     @StateObject private var snippetStore = SnippetStore()
     @StateObject private var historyStore = HistoryStore()
+    @StateObject private var keybindingStore = KeybindingStore()
     @StateObject private var tabsVM: TabsViewModel
 
     private let aiService: AIService
@@ -39,6 +40,7 @@ struct GhostwriterApp: App {
                 .environmentObject(snippetStore)
                 .environmentObject(historyStore)
                 .environmentObject(settingsVM)
+                .environmentObject(keybindingStore)
                 .onAppear {
                     historyStore.purgeOld(retentionDays: settingsVM.settings.historyRetentionDays)
                     syncGlobalHotkey()
@@ -82,7 +84,8 @@ struct GhostwriterApp: App {
                 }
                 .keyboardShortcut("]", modifiers: [.command, .shift])
             }
-            CommandGroup(replacing: .pasteboard) {
+            CommandGroup(after: .pasteboard) {
+                Divider()
                 Button("전체 복사") {
                     copyAll(clearAfter: false)
                 }
@@ -110,7 +113,7 @@ struct GhostwriterApp: App {
         }
 
         Settings {
-            SettingsView(viewModel: settingsVM)
+            SettingsView(viewModel: settingsVM, keybindingStore: keybindingStore)
         }
     }
 

@@ -6,6 +6,7 @@ import Combine
 struct EditorView: NSViewRepresentable {
     @ObservedObject var viewModel: EditorViewModel
     @ObservedObject var settingsVM: SettingsViewModel
+    @ObservedObject var keybindingStore: KeybindingStore
 
     /// Called when user types `/` in a slash-command position.
     var onSlashTrigger: (NSRect, String) -> Void = { _, _ in }
@@ -19,7 +20,9 @@ struct EditorView: NSViewRepresentable {
     var onSlashSelect: () -> Void = {}
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(viewModel: viewModel, settingsVM: settingsVM,
+        Coordinator(viewModel: viewModel,
+                    settingsVM: settingsVM,
+                    keybindingStore: keybindingStore,
                     onSlashTrigger: onSlashTrigger,
                     onSlashUpdate: onSlashUpdate,
                     onSlashEnd: onSlashEnd,
@@ -68,6 +71,11 @@ struct EditorView: NSViewRepresentable {
 
         textView.textContainerInset = NSSize(width: 8, height: 12)
 
+        // keybindings.json 기반 인터셉터를 NSTextView에 연결.
+        textView.onKeyDownIntercept = { [weak coordinator = context.coordinator] event in
+            coordinator?.handleKeyEvent(event) ?? false
+        }
+
         scrollView.documentView = textView
 
         // Line number ruler.
@@ -95,6 +103,7 @@ struct EditorView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         let viewModel: EditorViewModel
         let settingsVM: SettingsViewModel
+        let keybindingStore: KeybindingStore
         let onSlashTrigger: (NSRect, String) -> Void
         let onSlashUpdate: (String) -> Void
         let onSlashEnd: () -> Void
@@ -110,6 +119,7 @@ struct EditorView: NSViewRepresentable {
         init(
             viewModel: EditorViewModel,
             settingsVM: SettingsViewModel,
+            keybindingStore: KeybindingStore,
             onSlashTrigger: @escaping (NSRect, String) -> Void,
             onSlashUpdate: @escaping (String) -> Void,
             onSlashEnd: @escaping () -> Void,
@@ -118,6 +128,7 @@ struct EditorView: NSViewRepresentable {
         ) {
             self.viewModel = viewModel
             self.settingsVM = settingsVM
+            self.keybindingStore = keybindingStore
             self.onSlashTrigger = onSlashTrigger
             self.onSlashUpdate = onSlashUpdate
             self.onSlashEnd = onSlashEnd
@@ -294,96 +305,114 @@ struct EditorView: NSViewRepresentable {
             evaluateSlashContext(text: stringWithoutGhost(tv: tv), cursor: cursor)
         }
 
+        /// 모든 에디터 명령 디스패치는 `keybindings.json` 매핑을 거치므로,
+        /// `doCommandBy`는 stub. NSTextView 기본 동작(텍스트 입력, 커서 이동 등)이
+        /// 그대로 흐르도록 false만 반환한다.
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-            // While slash popup is active, intercept ↑ / ↓ / Enter for navigation.
-            if slashStart != nil {
-                if commandSelector == #selector(NSResponder.moveUp(_:)) {
-                    onSlashNavigate(-1)
-                    return true
-                }
-                if commandSelector == #selector(NSResponder.moveDown(_:)) {
-                    onSlashNavigate(1)
-                    return true
-                }
-                if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-                    onSlashSelect()
-                    return true
-                }
-            }
-
-            // Placeholder navigation takes precedence over ghost-text Tab.
-            if viewModel.inPlaceholderMode {
-                if commandSelector == #selector(NSResponder.insertTab(_:)) {
-                    moveToNextPlaceholder(forward: true)
-                    return true
-                }
-                if commandSelector == #selector(NSResponder.insertBacktab(_:)) {
-                    moveToNextPlaceholder(forward: false)
-                    return true
-                }
-                if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-                    viewModel.exitPlaceholderMode()
-                    return true
-                }
-                if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-                    viewModel.exitPlaceholderMode()
-                    return true
-                }
-            }
-
-            // Handle Cmd+→ → accept one word from ghost (ghost 없으면 기본 동작 유지)
-            // macOS는 Cmd+→을 moveToRightEndOfLine: 로 전달하므로 양쪽 모두 처리한다.
-            let isCmdRightArrow =
-                commandSelector == #selector(NSResponder.moveToRightEndOfLine(_:)) ||
-                commandSelector == #selector(NSResponder.moveToEndOfLine(_:))
-            if isCmdRightArrow {
-                if textView.ghostTextRange() != nil, !viewModel.ghostText.isEmpty {
-                    let ghostBefore = viewModel.ghostText
-                    if let newCursor = viewModel.acceptGhostWord() {
-                        // 수락된 단어 길이 = 수락 전 ghost - 수락 후 남은 ghost
-                        let acceptedLen = (ghostBefore as NSString).length
-                            - (viewModel.ghostText as NSString).length
-                        suppressTextDidChange = true
-                        textView.confirmGhostHead(prefixLength: acceptedLen)
-                        textView.setSelectedRange(NSRange(location: newCursor, length: 0))
-                        suppressTextDidChange = false
-                        viewModel.handleCursorChange(newCursor)
-                    }
-                    return true
-                }
-            }
-
-            // Handle Tab → accept ghost
-            if commandSelector == #selector(NSResponder.insertTab(_:)) {
-                if textView.ghostTextRange() != nil, !viewModel.ghostText.isEmpty {
-                    if let newCursor = viewModel.acceptGhost() {
-                        // Confirm in storage.
-                        suppressTextDidChange = true
-                        textView.confirmGhostText()
-                        textView.setSelectedRange(NSRange(location: newCursor, length: 0))
-                        suppressTextDidChange = false
-                        // Notify content listeners (without VM round-trip).
-                        viewModel.handleCursorChange(newCursor)
-                    }
-                    return true
-                }
-            }
-            // Handle Esc → reject ghost or end slash session
-            if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-                if textView.ghostTextRange() != nil {
-                    _ = textView.removeGhostText()
-                    viewModel.rejectGhost()
-                    onSlashEnd()
-                    slashStart = nil
-                    return true
-                }
-                if slashStart != nil {
-                    onSlashEnd()
-                    slashStart = nil
-                    return true
-                }
-            }
             return false
+        }
+
+        // MARK: - Keybinding dispatch
+
+        /// `EditorTextView.keyDown(with:)`에서 호출. 매핑된 명령이 있으면 dispatch 후 true.
+        func handleKeyEvent(_ event: NSEvent) -> Bool {
+            guard let tv = textView else { return false }
+            let ctx = currentWhenContext(textView: tv)
+            guard let command = keybindingStore.resolver.resolve(event: event, ctx: ctx) else {
+                return false
+            }
+            dispatch(command)
+            return true
+        }
+
+        private func currentWhenContext(textView tv: NSTextView) -> WhenContext {
+            let ghostVisible = !viewModel.ghostText.isEmpty || (tv.ghostTextRange() != nil)
+            return WhenContext(
+                editorFocus: tv.window?.firstResponder === tv,
+                ghostVisible: ghostVisible,
+                inPlaceholderMode: viewModel.inPlaceholderMode,
+                slashPopupVisible: slashStart != nil,
+                hasSelection: tv.selectedRange().length > 0
+            )
+        }
+
+        private func dispatch(_ command: CommandID) {
+            switch command {
+            case .noop:
+                break
+            case .editorAcceptGhost:
+                handleAcceptGhost()
+            case .editorAcceptGhostWord:
+                handleAcceptGhostWord()
+            case .editorRejectGhost:
+                handleRejectGhost()
+            case .placeholderNext:
+                moveToNextPlaceholder(forward: true)
+            case .placeholderPrevious:
+                moveToNextPlaceholder(forward: false)
+            case .placeholderExit:
+                viewModel.exitPlaceholderMode()
+            case .slashNavigateUp:
+                onSlashNavigate(-1)
+            case .slashNavigateDown:
+                onSlashNavigate(1)
+            case .slashSelect:
+                onSlashSelect()
+            case .slashDismiss:
+                onSlashEnd()
+                slashStart = nil
+            case .cursorLineStart:
+                textView?.moveToBeginningOfLine(nil)
+            case .cursorLineEnd:
+                textView?.moveToEndOfLine(nil)
+            case .cursorDocStart:
+                textView?.moveToBeginningOfDocument(nil)
+            case .cursorDocEnd:
+                textView?.moveToEndOfDocument(nil)
+            }
+        }
+
+        // MARK: - Command handlers
+
+        private func handleAcceptGhost() {
+            guard let textView = textView,
+                  textView.ghostTextRange() != nil,
+                  !viewModel.ghostText.isEmpty
+            else { return }
+            guard let newCursor = viewModel.acceptGhost() else { return }
+            suppressTextDidChange = true
+            textView.confirmGhostText()
+            textView.setSelectedRange(NSRange(location: newCursor, length: 0))
+            suppressTextDidChange = false
+            viewModel.handleCursorChange(newCursor)
+        }
+
+        private func handleAcceptGhostWord() {
+            guard let textView = textView,
+                  textView.ghostTextRange() != nil,
+                  !viewModel.ghostText.isEmpty
+            else { return }
+            let ghostBefore = viewModel.ghostText
+            guard let newCursor = viewModel.acceptGhostWord() else { return }
+            let acceptedLen = (ghostBefore as NSString).length
+                - (viewModel.ghostText as NSString).length
+            suppressTextDidChange = true
+            textView.confirmGhostHead(prefixLength: acceptedLen)
+            textView.setSelectedRange(NSRange(location: newCursor, length: 0))
+            suppressTextDidChange = false
+            viewModel.handleCursorChange(newCursor)
+        }
+
+        private func handleRejectGhost() {
+            guard let textView = textView else { return }
+            if textView.ghostTextRange() != nil {
+                _ = textView.removeGhostText()
+            }
+            viewModel.rejectGhost()
+            if slashStart != nil {
+                onSlashEnd()
+                slashStart = nil
+            }
         }
 
         // MARK: - Slash command detection

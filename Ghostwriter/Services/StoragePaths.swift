@@ -20,4 +20,5 @@ enum StoragePaths {
         appSupportDirectory.appendingPathComponent("history.json.bak")
     }
     static var tabsStateURL: URL { appSupportDirectory.appendingPathComponent("tabs-state.json") }
+    static var keybindingsURL: URL { appSupportDirectory.appendingPathComponent("keybindings.json") }
 }

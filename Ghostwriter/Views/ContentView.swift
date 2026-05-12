@@ -6,6 +6,7 @@ struct ContentView: View {
     @EnvironmentObject var snippetStore: SnippetStore
     @EnvironmentObject var historyStore: HistoryStore
     @EnvironmentObject var settingsVM: SettingsViewModel
+    @EnvironmentObject var keybindingStore: KeybindingStore
 
     @State private var dragStartWidth: CGFloat? = nil
     @State private var showSlashPopup: Bool = false
@@ -130,6 +131,7 @@ struct ContentView: View {
                 EditorView(
                     viewModel: vm,
                     settingsVM: settingsVM,
+                    keybindingStore: keybindingStore,
                     onSlashTrigger: { rect, query in
                         slashAnchor = rect
                         slashQuery = query

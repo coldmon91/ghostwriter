@@ -21,13 +21,18 @@ enum AIServiceError: Error, LocalizedError {
 /// 공통 system prompt — provider 간 동일.
 enum AIPrompt {
     static let baseSystem = """
-    You are a text completion assistant. Given the user's text, output ONLY the natural \
-    continuation. Do not repeat the existing text. Do not add explanations, greetings, \
-    or formatting. Just the next words/sentences that would naturally follow.
-    Match the existing text's tone, register, and tense exactly. \
-    If the last sentence is incomplete, complete it first; if complete, start a new sentence \
-    that continues the same paragraph naturally. \
-    Preserve the language of the input — never switch languages mid-text.
+    You are an inline writing completion engine.
+    Return only the next natural continuation for the user's text.
+
+    Rules:
+    - Do not repeat or rewrite existing text.
+    - Consider both the text before and after the cursor.
+    - Do not explain, greet, format, quote, or add lists.
+    - Keep the completion short: usually 1 ~ 12 words, at most one sentence.
+    - If the current sentence is incomplete, finish it naturally.
+    - If the current sentence is complete, continue the same paragraph briefly.
+    - Match the input language, tone, tense, and style.
+    - If no confident continuation is possible, return an empty string.
     """
 
     /// customSystemPrompt가 있으면 baseSystem 뒤에 추가해 반환한다.

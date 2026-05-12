@@ -126,13 +126,14 @@ MVP 이후 진행해야 할 작업 목록. 우선순위는 카테고리 순.
 - [ ] **플러그인 시스템** — 사용자 정의 텍스트 변환 (번역, 요약, 포맷팅)
 - [ ] **컨텍스트 인지 자동완성** — 직전 에디터 내용 이외에 스니펫 / 이력에서 RAG로 컨텍스트 보강
 - [ ] **단축어(snippet alias)** — `;today`, `;email-sig` 같은 trigger 패턴
-- [ ] **VSCode 스타일 단축키 매핑 지원** — `keymapping.json` (또는 `keybindings.json`)로 사용자 정의 키바인딩 로드, 명령 ID 기반 매핑 테이블, when-context 조건(`editorFocus`, `slashPopupVisible` 등) 지원
+- [x] **VSCode 스타일 단축키 매핑 지원** — `keymapping.json` (또는 `keybindings.json`)로 사용자 정의 키바인딩 로드, 명령 ID 기반 매핑 테이블, when-context 조건(`editorFocus`, `slashPopupVisible` 등) 지원 — 에디터 계층 한정 (메뉴/글로벌 핫키는 범위 외)
+- [ ] 사전 프롬프트가 입력되면 system prompt 는 비활성화 
+- [ ] 사전 프롬프트를 사용자가 여러개 준비해 두고, 필요시 적절한 프롬프트를 선택해 적용할 수 있도록 한다.
+- [ ] 글씨 간격은 항상 일정하게 유지되도록 한다. 
 
 ---
 
 ## 5. 문서화 / 개발자 경험
 
 - [ ] `README.md` 작성 — 빌드 방법, 단축키 표, 스크린샷
-- [ ] 빌드 스크립트 GitHub Actions 통합 (CI 검증)
 - [ ] `CHANGELOG.md` 도입
-- [ ] 라이선스 결정 (오픈 / 비공개)

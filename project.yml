@@ -1,0 +1,48 @@
+name: Ghostwriter
+options:
+  bundleIdPrefix: com.rsupport.ghostwriter
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift.git
+    from: "6.29.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+    ENABLE_HARDENED_RUNTIME: YES
+    PRODUCT_NAME: Ghostwriter
+    INFOPLIST_KEY_CFBundleDisplayName: Ghostwriter
+    INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+    INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026"
+    INFOPLIST_KEY_NSPrincipalClass: NSApplication
+    INFOPLIST_KEY_NSMainStoryboardFile: ""
+    COMBINE_HIDPI_IMAGES: YES
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+targets:
+  Ghostwriter:
+    type: application
+    platform: macOS
+    sources:
+      - path: Ghostwriter
+    dependencies:
+      - package: GRDB
+        product: GRDB
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rsupport.ghostwriter
+        ENABLE_APP_SANDBOX: NO
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSUIElement: NO
+    entitlements:
+      path: Ghostwriter/Ghostwriter.entitlements
+      properties:
+        com.apple.security.network.client: true
+        com.apple.security.files.user-selected.read-write: true
